@@ -143,8 +143,16 @@ pub fn run() {
       let _ = webview.window().show();
     }
   });
+  let builder = builder.setup(|app| {
+    app.manage(lan::Lan::new(Arc::new(GameEvents(app.handle().clone()))));
+    // The Android activity creates its single `main` window from tauri.android.conf.json. Desktop keeps
+    // its dynamic startup window so it can optionally launch OMF Studio instead of the game.
+    #[cfg(not(mobile))]
+    open_window(app.handle(), studio_start())?;
+    Ok(())
+  });
   #[cfg(not(mobile))]
-  let invoke_handler = tauri::generate_handler![
+  let builder = builder.invoke_handler(tauri::generate_handler![
     save_file,
     open_studio,
     os_languages,
@@ -155,9 +163,9 @@ pub fn run() {
     lan_join,
     lan_send,
     lan_close
-  ];
+  ]);
   #[cfg(mobile)]
-  let invoke_handler = tauri::generate_handler![
+  let builder = builder.invoke_handler(tauri::generate_handler![
     save_file,
     os_languages,
     lan_info,
@@ -167,18 +175,8 @@ pub fn run() {
     lan_join,
     lan_send,
     lan_close
-  ];
-  let started = builder
-    .setup(|app| {
-      app.manage(lan::Lan::new(Arc::new(GameEvents(app.handle().clone()))));
-      // The Android activity creates its single `main` window from tauri.android.conf.json. Desktop keeps
-      // its dynamic startup window so it can optionally launch OMF Studio instead of the game.
-      #[cfg(not(mobile))]
-      open_window(app.handle(), studio_start())?;
-      Ok(())
-    })
-    .invoke_handler(invoke_handler)
-    .run(tauri::generate_context!());
+  ]);
+  let started = builder.run(tauri::generate_context!());
   if let Err(e) = started {
     fatal(&e.to_string());
   }
