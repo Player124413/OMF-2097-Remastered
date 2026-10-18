@@ -339,10 +339,11 @@ npm run android:build                # release APKs for the supported Android AB
 npm run android:bundle               # Android App Bundle for store distribution
 ```
 
-For a ready-to-install testing build, `.github/workflows/android-apk.yml` builds an optimized ARM64 APK signed with
-the Android debug key on pull requests and pushes to `main`, or when run manually from **Actions → Android APK**.
-Download the APK from that run's artifact. It targets 64-bit ARM phones; it is for device testing, not a Play Store
-release. Play distribution needs your own release signing key.
+For ready-to-install testing builds, `.github/workflows/android-apk.yml` builds optimized, debug-key-signed APKs for
+64-bit ARM (`arm64`) and 32-bit ARM (`armv7`) on pull requests and pushes to `main`, or when run manually from
+**Actions → Android APK**. The artifact contains `OMF-2097-Remastered-arm64.apk` for 64-bit ARM phones and
+`OMF-2097-Remastered-armv7-32bit.apk` for 32-bit ARM phones. These are for device testing, not Play Store releases;
+Play distribution needs your own release signing key.
 
 For a physical device, enable USB debugging and accept its ADB prompt. If Android Studio cannot reach the Vite server,
 pass the computer's LAN address to the mobile dev server, for example `npm run android:dev -- --host 192.168.1.25`.
