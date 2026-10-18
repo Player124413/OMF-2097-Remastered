@@ -92,15 +92,14 @@ describe.skipIf(!hasGameData)('cutscenes (headless)', () => {
     expect(portrait.curSpriteId).toBe(7); // halted
   });
 
-  it('escape does not skip ending pages', () => {
+  it('escape skips the full ending sequence to the scoreboard', () => {
     const gs = createGame(SceneId.MENU);
     gs.swapScene(SceneId.END);
     const run = new HeadlessRunner(gs);
     run.advance(700);
     tap(run, 'Escape');
     run.advance(200);
-    expect(scene(gs).pos).toBe(0);
-    expect(gs.nextId).toBe(SceneId.END);
+    expect(gs.nextId).toBe(SceneId.SCOREBOARD);
   });
 
   it('plays the tournament victory cutscene from the CHR texts', () => {
@@ -127,6 +126,18 @@ describe.skipIf(!hasGameData)('cutscenes (headless)', () => {
       tap(run);
       run.advance(100);
     }
+    expect(gs.nextId).toBe(SceneId.VS);
+  });
+
+  it('escape skips a tournament cutscene to the next screen', () => {
+    const gs = createGame(SceneId.MENU, [0, 1], [3, 5]);
+    gs.getPlayer(0).chr = fakeChr('NORTH_AM.TRN', 3);
+    gs.fightStats.winner = 0;
+    gs.swapScene(SceneId.TRN_CUTSCENE);
+    const run = new HeadlessRunner(gs);
+    run.advance(500);
+    tap(run, 'Escape');
+    run.advance(100);
     expect(gs.nextId).toBe(SceneId.VS);
   });
 
