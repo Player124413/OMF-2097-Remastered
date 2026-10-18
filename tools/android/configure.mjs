@@ -43,6 +43,14 @@ function configureManifest(xml) {
   return text.replace(activity, updated);
 }
 
+function configureTestSigning(source) {
+  const releaseBlock = 'getByName("release") {';
+  const signing = 'signingConfig = signingConfigs.getByName("debug")';
+  if (source.includes(signing)) return source;
+  if (!source.includes(releaseBlock)) throw new Error('Could not find the Android release build type to enable test signing.');
+  return source.replace(releaseBlock, `${releaseBlock}\n            ${signing}`);
+}
+
 function configureActivity(source) {
   let text = source;
   const imports = [
@@ -112,6 +120,14 @@ try {
   const activity = await fs.readFile(activityPath, 'utf8');
   const configuredActivity = configureActivity(activity);
   if (configuredActivity !== activity) await fs.writeFile(activityPath, configuredActivity);
+
+  if (process.env.ANDROID_DEBUG_SIGN_RELEASE === '1') {
+    const gradlePath = path.join(android, 'app', 'build.gradle.kts');
+    const gradle = await fs.readFile(gradlePath, 'utf8');
+    const configuredGradle = configureTestSigning(gradle);
+    if (configuredGradle !== gradle) await fs.writeFile(gradlePath, configuredGradle);
+    console.log('Android release variant configured with the debug key for sideload testing.');
+  }
 
   console.log('Android configured: landscape, immersive full-screen, cutout support, and haptics permission.');
 } catch (error) {

@@ -339,9 +339,10 @@ npm run android:build                # release APKs for the supported Android AB
 npm run android:bundle               # Android App Bundle for store distribution
 ```
 
-For a ready-to-install testing build, `.github/workflows/android-apk.yml` builds a debug-signed universal APK on pull
-requests and pushes to `main`, or when run manually from **Actions → Android APK**. Download the APK from that run's
-artifact. It is for device testing, not a Play Store release; Play distribution needs a release signing key.
+For a ready-to-install testing build, `.github/workflows/android-apk.yml` builds an optimized universal APK signed with
+the Android debug key on pull requests and pushes to `main`, or when run manually from **Actions → Android APK**.
+Download the APK from that run's artifact. It is for device testing, not a Play Store release; Play distribution needs
+your own release signing key.
 
 For a physical device, enable USB debugging and accept its ADB prompt. If Android Studio cannot reach the Vite server,
 pass the computer's LAN address to the mobile dev server, for example `npm run android:dev -- --host 192.168.1.25`.
