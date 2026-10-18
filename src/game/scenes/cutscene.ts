@@ -7,7 +7,7 @@ import type { CtrlEvent } from '../../controller/controller';
 import { Palette } from '../../formats/palette';
 import { bkGetInfo, langGet } from '../../resources/resources';
 import { vga } from '../../video/vga';
-import { ACT_ESC, ACT_KICK, ACT_PUNCH, RENDER_LAYER_BOTTOM, RENDER_LAYER_TOP, SceneId } from '../constants';
+import { ACT_KICK, ACT_PUNCH, RENDER_LAYER_BOTTOM, RENDER_LAYER_TOP, SceneId } from '../constants';
 import { registerScene, type GameState } from '../gameState';
 import { FontSize, HAlign, Text } from '../gui/text';
 import { GameObject } from '../object';
@@ -177,13 +177,6 @@ export class CutsceneScene extends Scene {
     gs.menuPoll(ev);
     for (const e of ev) {
       if (e.type !== 'action') continue;
-      if (e.action === ACT_ESC) {
-        // The single-player ending spans END, END1 and END2; skip all of it, not just the current text page.
-        gs.setNext(this.id === SceneId.END || this.id === SceneId.END1 || this.id === SceneId.END2
-          ? SceneId.SCOREBOARD
-          : this.nextScene());
-        continue;
-      }
       if (e.action !== ACT_KICK && e.action !== ACT_PUNCH) continue;
       if (player1.chr && (player1.chr.cutsceneText[this.pos + 1] ?? '').length > 0) {
         this.pos++;
