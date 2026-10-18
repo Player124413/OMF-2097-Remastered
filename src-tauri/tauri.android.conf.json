@@ -1,0 +1,23 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "One Must Fall 2097 Remastered",
+        "url": "index.html",
+        "width": 1280,
+        "height": 720,
+        "fullscreen": true,
+        "resizable": false,
+        "decorations": false,
+        "visible": true
+      }
+    ]
+  },
+  "bundle": {
+    "android": {
+      "minSdkVersion": 24,
+      "versionCode": 4
+    }
+  }
+}

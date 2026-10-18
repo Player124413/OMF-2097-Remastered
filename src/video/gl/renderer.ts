@@ -234,6 +234,8 @@ export class GLRenderer {
   options: PresentOptions = { mode: 'remastered', scaleMode: 'sharp', classicWidescreen: false, bloom: true, hdResolution: 'auto', hdHud: true };
   /** Dynamic resolution: maximum screen pixels per native pixel for the remastered renderer. */
   private hdMaxScale = Infinity;
+  /** The host's intentional render cap, used to avoid mistaking high-refresh frame pacing for a GPU overload. */
+  frameRateCap = 0;
   /** The credits' background in the atlas (index-adding sprites brighten its colors), else null. */
   private addBgRect: AtlasRect | null = null;
   private timerExt: { TIME_ELAPSED_EXT: number; GPU_DISJOINT_EXT: number } | null = null;
@@ -334,7 +336,8 @@ export class GLRenderer {
     const gpu = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
     // (WebKit names every Apple graphics chip "Apple GPU": a phone's or tablet's is modest, a Mac's is not)
     const appleTouch = /apple gpu/i.test(gpu) && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0;
-    this.isLowEndGpu = appleTouch || /intel|mali|adreno|powervr|llvmpipe|swiftshader|basic render/i.test(gpu);
+    const android = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+    this.isLowEndGpu = appleTouch || android || /intel|mali|adreno|powervr|llvmpipe|swiftshader|basic render/i.test(gpu);
     if (this.isLowEndGpu) this.hdMaxScale = 4;
   }
 
@@ -384,7 +387,8 @@ export class GLRenderer {
     this.frameIntervals.length = 0;
     // (not the shortest interval: two frames drawn close together would pass for a faster beat)
     const beat = sorted[Math.floor(sorted.length / 10)];
-    if (this.options.hdResolution !== 'auto' || avg < beat * 1.35) return;
+    const target = this.frameRateCap > 0 ? 1000 / this.frameRateCap : beat;
+    if (this.options.hdResolution !== 'auto' || avg < target * 1.35) return;
     this.hdMaxScale = Math.max(2, Math.min(this.hdMaxScale, displayScale) * 0.8);
   }
 

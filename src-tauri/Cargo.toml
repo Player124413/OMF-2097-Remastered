@@ -8,10 +8,9 @@ publish = false
 
 [lib]
 # The `_lib` suffix keeps the lib name distinct from the bin name (cargo#8519 on Windows).
-# Desktop-only, so an rlib is all we need. Tauri mobile targets would need
-# `crate-type = ["staticlib", "cdylib", "rlib"]` here.
+# Desktop uses the rlib; Tauri mobile loads the same application as a static/shared library.
 name = "omf2097_remastered_lib"
-crate-type = ["rlib"]
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }

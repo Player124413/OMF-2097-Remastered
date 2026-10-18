@@ -35,6 +35,68 @@ export const MODERN_SPECIAL_KEYS = { p1: ['KeyL', 'KeyH'], p2: ['Slash', 'Numpad
 
 export type GraphicsMode = 'classic' | 'remastered';
 
+/** A configurable on-screen control (normalized to the viewport, so the layout survives rotation and resolution changes). */
+export type TouchControlId = 'stick' | 'punch' | 'kick' | 'special' | 'pause';
+
+export interface TouchControlPosition {
+  /** Center position, from 0 to 1 of the safe viewport. */
+  x: number;
+  y: number;
+  /** Multiplier of the control's device-adaptive base size. */
+  scale: number;
+}
+
+export interface TouchLayout {
+  /** Overall opacity of the game controls, 0.25..1. */
+  opacity: number;
+  /** Virtual stick's neutral dead-zone as a fraction of its travel. */
+  deadzone: number;
+  /** Short Android vibration on attacks and pause. */
+  haptics: boolean;
+  controls: Record<TouchControlId, TouchControlPosition>;
+}
+
+/** Fresh default values: each player's saved layout remains independent and mutable. */
+export function defaultTouchLayout(): TouchLayout {
+  return {
+    opacity: 0.84,
+    deadzone: 0.18,
+    haptics: true,
+    controls: {
+      stick: { x: 0.14, y: 0.76, scale: 1.08 },
+      punch: { x: 0.81, y: 0.79, scale: 1.04 },
+      kick: { x: 0.93, y: 0.88, scale: 1.04 },
+      special: { x: 0.92, y: 0.67, scale: 0.9 },
+      pause: { x: 0.96, y: 0.09, scale: 0.78 },
+    },
+  };
+}
+
+/** Repairs old, partial or hand-edited layout data without allowing controls to end up off-screen. */
+export function normalizeTouchLayout(value: unknown): TouchLayout {
+  const fallback = defaultTouchLayout();
+  const source = value && typeof value === 'object' ? value as Partial<TouchLayout> : {};
+  const finite = (n: unknown, d: number, min: number, max: number): number =>
+    typeof n === 'number' && Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : d;
+  const positions = source.controls && typeof source.controls === 'object' ? source.controls : {};
+  const controls = {} as TouchLayout['controls'];
+  for (const id of Object.keys(fallback.controls) as TouchControlId[]) {
+    const given = (positions as Partial<TouchLayout['controls']>)[id];
+    const d = fallback.controls[id];
+    controls[id] = {
+      x: finite(given?.x, d.x, 0.04, 0.96),
+      y: finite(given?.y, d.y, 0.05, 0.95),
+      scale: finite(given?.scale, d.scale, 0.65, 1.6),
+    };
+  }
+  return {
+    opacity: finite(source.opacity, fallback.opacity, 0.25, 1),
+    deadzone: finite(source.deadzone, fallback.deadzone, 0.08, 0.4),
+    haptics: typeof source.haptics === 'boolean' ? source.haptics : fallback.haptics,
+    controls,
+  };
+}
+
 export interface Settings {
   video: {
     /** Classic = pixel-exact 320x200; remastered = HD, widescreen, effects. */
@@ -130,6 +192,8 @@ export interface Settings {
     finisherKeys: boolean;
     /** Touch controls (platform/touch.ts): shown on touch screens once touched, always, or never. */
     touch: 'auto' | 'on' | 'off';
+    /** Per-device position, size, opacity and stick feel for the virtual controls. */
+    touchLayout: TouchLayout;
     p1: KeyBindings;
     p2: KeyBindings;
   };
@@ -176,9 +240,9 @@ export interface Settings {
  * saved before becomes the male voice / off. 5: the new robots and arenas became a mod that comes with the game
  * (mods/extras.ts): a player who had either on finds the mod on (mods/bundled.ts migrateNewContent). 6: the language
  * became a language code or 'auto' (it was the original's language file): German stays German, the English that was
- * everyone's default becomes the system's language.
+ * everyone's default becomes the system's language. 7: the touch controls gained an editable, normalized layout.
  */
-const REVISION = 6;
+const REVISION = 7;
 
 export function defaultSettings(): Settings {
   return {
@@ -224,6 +288,7 @@ export function defaultSettings(): Settings {
       specialButton: true,
       finisherKeys: false,
       touch: 'auto',
+      touchLayout: defaultTouchLayout(),
       // KeyboardEvent.code values. Player 1: arrows / numpad, Enter + Right Shift (like the reference defaults).
       p1: {
         jumpUp: ['ArrowUp', 'Numpad8'],
@@ -327,6 +392,7 @@ export function loadSettings(): Settings {
   } catch {
     current = defaultSettings();
   }
+  current.keys.touchLayout = normalizeTouchLayout(current.keys.touchLayout);
   return current;
 }
 

@@ -28,7 +28,8 @@ up a corporate tournament. It was one of the great DOS fighting games, and it ha
 
 **This project brings it back.** It is a faithful reimplementation of the game's engine that plays the **original game
 files**, as a free **app for Windows, macOS and Linux** or in a **browser**. Play it exactly as it looked in 1994, or
-**remastered in HD** with new effects, modes and tools. One key, <kbd>F2</kbd>, switches between the two at any moment, even mid-fight.
+**remastered in HD** with new effects, modes and tools. One key, <kbd>F2</kbd>, switches between the two at any moment,
+even mid-fight. The web build is installable on Android, and the source includes a fullscreen native Android build path.
 
 <table>
   <tr>
@@ -46,7 +47,7 @@ files**, as a free **app for Windows, macOS and Linux** or in a **browser**. Pla
     <td width="33%" valign="top">
       <h3><img src="docs/media/icon-modern.png" alt="" width="26" align="top"> Modern</h3>
       LAN games, fourteen languages, a training lab, replays and clips, new modes, a robot workshop, mods and the OMF
-      Studio mod tools, gamepads with rumble, touch controls, and it works offline.
+      Studio mod tools, gamepads with rumble, editable touch controls, an installable Android web app, and it works offline.
     </td>
   </tr>
 </table>
@@ -103,7 +104,8 @@ files**, as a free **app for Windows, macOS and Linux** or in a **browser**. Pla
 </details>
 
 **Or [play it online](https://jared-woodruff.github.io/OMF-2097-Remastered/)**, with nothing to install: it runs in any modern browser, on a computer, a tablet or a
-phone, and keeps working offline once it has loaded.
+phone, and keeps working offline once it has loaded. On Android, add it to the home screen for a fullscreen installable
+web app. A native Android APK/AAB can also be built from source; see [the Android build guide](docs/BUILDING.md#android).
 
 **On the first start**, one screen sets you up: the original 1994 look in a single press, or the remastered graphics,
 effects, announcer and music the way you like them. Everything can be changed later in **Options**.
@@ -147,7 +149,9 @@ for the F keys
   motions work as always.
 - **Your own keys**: a modern keyboard layout (WASD for player 1), and any key rebound in **Options › Controls**.
   **Keys and buttons** (also in the pause menu) shows every action on the keyboard and the controller.
-- **Touch controls** on phones and tablets: a stick under your left thumb, punch, kick, special and pause buttons.
+- **Touch controls** on phones and tablets: a responsive eight-way stick, punch, kick, special and pause buttons. Open
+  **Options › Controls › Edit Touch Controls** to drag and resize each control, tune stick dead-zone and opacity, toggle
+  haptics, or restore the default layout.
 - **Anywhere**: <kbd>F3</kbd> next song (your own music), <kbd>Alt</kbd>+<kbd>Enter</kbd> fullscreen (on a Mac also
   <kbd>Ctrl</kbd>+<kbd>Cmd</kbd>+<kbd>F</kbd>), <kbd>F12</kbd> screenshot (in the desktop app; screenshots, clips and
   videos go to the *OMF 2097 Remastered* folder in your *Downloads*). The mouse works in every menu.
@@ -542,6 +546,7 @@ flowchart LR
 | Graphics | WebGL2: the classic VGA pipeline, HD reconstruction, particles, lighting and post-processing |
 | Sound | Web Audio, an AudioWorklet mixer and a port of the game's MASI music driver |
 | Desktop app | Tauri 2: WebView2 on Windows, WebKit on macOS and Linux |
+| Android app | Tauri 2: Android System WebView, landscape immersive mode, adaptive render scale and configurable multitouch controls |
 | Tests | Vitest: 350 tests that run the game itself, headless, against the original data |
 
 - **The HD artwork** is matched to the game's pictures by a fingerprint of their pixels, so the game's code doesn't

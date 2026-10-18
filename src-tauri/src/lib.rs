@@ -10,15 +10,21 @@
 mod lan;
 
 use std::sync::Arc;
-use std::time::Duration;
 
-use tauri::{webview::PageLoadEvent, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, State};
+
+#[cfg(not(mobile))]
+use std::time::Duration;
+#[cfg(not(mobile))]
+use tauri::{webview::PageLoadEvent, WebviewUrl, WebviewWindowBuilder};
 
 /// Show a window after this long even if the page never reports that it finished loading.
+#[cfg(not(mobile))]
 const SHOW_WINDOW_FALLBACK: Duration = Duration::from_secs(5);
 
 /// WebView2's arguments: the same for every window (windows that share the storage must agree on them). Timers keep
 /// their pace in a hidden window: a LAN game goes on while its window is minimized (src/main.ts, the hidden loop).
+#[cfg(not(mobile))]
 const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required \
    --disable-background-timer-throttling";
 
@@ -28,6 +34,7 @@ const SAVE_EXTENSIONS: &[&str] = &["png", "gif", "mp4", "webm", "rec", "omfmod",
 /// Whether this start opens OMF Studio instead of the game: `--studio`, or the program's file is named like Studio.
 /// The file is the one the player started: the AppImage itself on Linux (not the program unpacked from it), the `.app`
 /// bundle on macOS (its program inside keeps the game's name).
+#[cfg(not(mobile))]
 fn studio_start() -> bool {
   // (args_os: an argument that is not valid Unicode must not stop the program)
   if std::env::args_os().skip(1).any(|a| a.eq_ignore_ascii_case("--studio")) {
@@ -50,6 +57,7 @@ fn studio_start() -> bool {
 
 /// Opens a window: the game ("main", index.html) or OMF Studio ("studio", studio.html). Created hidden and
 /// shown once its page has loaded, so there is no white flash while WebView2 starts up.
+#[cfg(not(mobile))]
 fn open_window(app: &tauri::AppHandle, studio: bool) -> tauri::Result<tauri::WebviewWindow> {
   let (label, page, title, size) = if studio {
     ("studio", "studio.html", "OMF Studio", (1440.0, 900.0))
@@ -102,6 +110,7 @@ fn os_languages() -> Vec<String> {
 
 /// Opens OMF Studio's window (or brings it to the front). Async: on Windows, building a window from a synchronous
 /// command deadlocks (it runs on the main thread the window needs).
+#[cfg(not(mobile))]
 #[tauri::command]
 async fn open_studio(app: tauri::AppHandle) -> Result<(), String> {
   open_window(&app, true).map(|_| ()).map_err(|e| e.to_string())
@@ -127,31 +136,47 @@ pub fn run() {
       }
     }
   });
-  let started = builder
-    // Windows are created hidden (open_window) and shown once their page has loaded.
-    .on_page_load(|webview, payload| {
-      if payload.event() == PageLoadEvent::Finished {
-        let _ = webview.window().show();
-      }
-    })
-    .setup(|app| {
-      app.manage(lan::Lan::new(Arc::new(GameEvents(app.handle().clone()))));
-      open_window(app.handle(), studio_start())?;
-      Ok(())
-    })
-    .invoke_handler(tauri::generate_handler![
-      save_file,
-      open_studio,
-      os_languages,
-      lan_info,
-      lan_host,
-      lan_unhost,
-      lan_scan,
-      lan_join,
-      lan_send,
-      lan_close
-    ])
-    .run(tauri::generate_context!());
+  // Desktop windows are created hidden and shown once their page has loaded; Android owns one fullscreen activity.
+  #[cfg(not(mobile))]
+  let builder = builder.on_page_load(|webview, payload| {
+    if payload.event() == PageLoadEvent::Finished {
+      let _ = webview.window().show();
+    }
+  });
+  let builder = builder.setup(|app| {
+    app.manage(lan::Lan::new(Arc::new(GameEvents(app.handle().clone()))));
+    // The Android activity creates its single `main` window from tauri.android.conf.json. Desktop keeps
+    // its dynamic startup window so it can optionally launch OMF Studio instead of the game.
+    #[cfg(not(mobile))]
+    open_window(app.handle(), studio_start())?;
+    Ok(())
+  });
+  #[cfg(not(mobile))]
+  let builder = builder.invoke_handler(tauri::generate_handler![
+    save_file,
+    open_studio,
+    os_languages,
+    lan_info,
+    lan_host,
+    lan_unhost,
+    lan_scan,
+    lan_join,
+    lan_send,
+    lan_close
+  ]);
+  #[cfg(mobile)]
+  let builder = builder.invoke_handler(tauri::generate_handler![
+    save_file,
+    os_languages,
+    lan_info,
+    lan_host,
+    lan_unhost,
+    lan_scan,
+    lan_join,
+    lan_send,
+    lan_close
+  ]);
+  let started = builder.run(tauri::generate_context!());
   if let Err(e) = started {
     fatal(&e.to_string());
   }

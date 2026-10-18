@@ -1,0 +1,136 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'src-tauri/**'
+      - 'tools/android/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - '.github/workflows/android-apk.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'src-tauri/**'
+      - 'tools/android/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build installable ARM64 and ARMv7 testing APKs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0 ndk;27.2.12479018
+
+      - name: Set Android NDK path
+        run: |
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          test -d "$ANDROID_HOME/ndk/27.2.12479018"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: android
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - run: npm ci
+
+      - name: Typecheck frontend
+        run: npm run typecheck
+
+      - name: Generate Android project
+        run: npx tauri android init --ci --skip-targets-install && node tools/android/configure.mjs
+
+      # Build optimized release APKs for 64-bit and 32-bit ARM phones; debug-key signing keeps them installable for testing.
+      - name: Build ARM64 and ARMv7 testing APKs
+        shell: bash
+        env:
+          ANDROID_DEBUG_SIGN_RELEASE: '1'
+        run: |
+          set +e
+          npm run android:build -- --ci --target aarch64 armv7 --split-per-abi 2>&1 | tee android-build.log
+          result=${PIPESTATUS[0]}
+          if ((result != 0)); then
+            excerpt=$(tail -n 45 android-build.log | sed -E 's/\x1B\[[0-9;]*[[:alpha:]]//g' | tr '\n' ' ' | cut -c1-4000 | sed 's/%/%25/g; s/\r/%0D/g')
+            echo "::error title=Android build failure details::$excerpt"
+            exit "$result"
+          fi
+
+      - name: Upload Android build log on failure
+        if: failure() && hashFiles('android-build.log') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: OMF-2097-Android-build-log-${{ github.run_number }}
+          path: android-build.log
+          retention-days: 14
+
+      - name: Collect APK and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t apks < <(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*.apk' -print | sort)
+          if ((${#apks[@]} == 0)); then
+            echo 'Gradle did not produce an APK.' >&2
+            exit 1
+          fi
+          mkdir -p artifacts/android-apk
+          for apk in "${apks[@]}"; do
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$apk"
+            abi=$(basename "$(dirname "$(dirname "$apk")")")
+            case "$abi" in
+              arm64) name='OMF-2097-Remastered-arm64.apk' ;;
+              arm) name='OMF-2097-Remastered-armv7-32bit.apk' ;;
+              *) echo "Unexpected APK ABI output path: $apk" >&2; exit 1 ;;
+            esac
+            cp "$apk" "artifacts/android-apk/$name"
+          done
+          test -s artifacts/android-apk/OMF-2097-Remastered-arm64.apk
+          test -s artifacts/android-apk/OMF-2097-Remastered-armv7-32bit.apk
+          (cd artifacts/android-apk && sha256sum *.apk > SHA256SUMS)
+          ls -lh artifacts/android-apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: OMF-2097-Remastered-Android-arm64-armv7-${{ github.run_number }}
+          path: artifacts/android-apk/
+          if-no-files-found: error
+          retention-days: 14

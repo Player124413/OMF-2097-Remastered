@@ -136,18 +136,19 @@ const CSS = `
 #boot.is-setup .meter, #boot.is-setup .status { opacity: 0; height: 0; margin: 0; padding: 0; overflow: hidden; }
 #boot.is-setup .tip { opacity: 0; transition: opacity .3s; }
 #omf-setup { position: fixed; inset: 0; z-index: 60; display: flex; justify-content: center; align-items: flex-start;
-  padding-top: max(27vh, 150px); font-family: ${UI_FONT}; color: #dfe7ff; opacity: 0; transition: opacity .45s ease .25s; }
+  box-sizing: border-box; padding-top: max(27vh, 150px); font-family: ${UI_FONT}; color: #dfe7ff; opacity: 0; transition: opacity .45s ease .25s; }
 #omf-setup.is-on { opacity: 1; }
 #omf-setup.is-out { opacity: 0; transition: opacity .35s ease; }
-#omf-setup .panel { width: min(1000px, 94vw); max-height: 70vh; display: flex; flex-direction: column; border-radius: 16px;
+#omf-setup > div { width: min(1000px, 94vw); max-height: 100%; min-height: 0; display: flex; flex-direction: column; }
+#omf-setup .panel { width: 100%; max-height: 70vh; min-height: 0; display: flex; flex-direction: column; border-radius: 16px;
   background: linear-gradient(180deg, rgba(12, 18, 44, .82), rgba(5, 8, 22, .88)); border: 1px solid rgba(120, 160, 255, .3);
   box-shadow: 0 30px 90px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .06); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); overflow: hidden; }
-#omf-setup header { padding: clamp(14px, 2.4vh, 26px) clamp(20px, 3vw, 40px) clamp(8px, 1.4vh, 14px); }
+#omf-setup header { flex: 0 0 auto; padding: clamp(14px, 2.4vh, 26px) clamp(20px, 3vw, 40px) clamp(8px, 1.4vh, 14px); }
 #omf-setup h1 { margin: 0; font-weight: 900; font-size: clamp(18px, 1.7vw, 28px); letter-spacing: .12em;
   background: linear-gradient(180deg, #fff 0%, #dfe6f5 46%, #fff 52%, #7c8aa8 58%, #e9eef8 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent; }
 #omf-setup header p { margin: .5em 0 0; font-weight: 500; font-size: clamp(11px, .9vw, 15px); color: #a9b9e2; letter-spacing: .03em; }
-#omf-setup .rows { overflow-y: auto; padding: 0 clamp(10px, 1.6vw, 22px); }
+#omf-setup .rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 clamp(10px, 1.6vw, 22px); }
 #omf-setup .row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 18px; margin: 2px 0;
   padding: clamp(7px, 1.15vh, 12px) clamp(10px, 1.4vw, 18px); border-radius: 10px; border-inline-start: 3px solid transparent; }
 #omf-setup .row.is-focus { background: rgba(90, 130, 255, .12); border-inline-start-color: #4fd2ff; }
@@ -163,7 +164,7 @@ const CSS = `
 #omf-setup .chip:hover { border-color: rgba(160, 190, 255, .7); color: #fff; }
 #omf-setup .chip.is-on { background: linear-gradient(180deg, #ffe08a, #ffb02e); border-color: #ffc23d; color: #1a1204; }
 #omf-setup .chip.is-on small { color: #5a3d06; }
-#omf-setup footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+#omf-setup footer { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   padding: clamp(10px, 1.8vh, 18px) clamp(20px, 3vw, 40px); border-top: 1px solid rgba(120, 160, 255, .16); }
 #omf-setup .presets { display: flex; gap: 10px; flex-wrap: wrap; }
 #omf-setup .btn { cursor: pointer; border-radius: 10px; padding: .75em 1.3em; font: 700 clamp(10px, .8vw, 13px) ${UI_FONT};
@@ -173,8 +174,31 @@ const CSS = `
   background: linear-gradient(180deg, #ffd27a, #ff8a2a 55%, #ff5a14); box-shadow: 0 0 22px rgba(255, 120, 40, .45); }
 #omf-setup .start:hover, #omf-setup .start.is-focus { color: #1b0b02; background: linear-gradient(180deg, #ffe3a0, #ffa04a 55%, #ff6a24);
   box-shadow: 0 0 30px rgba(255, 140, 60, .75); outline: 2px solid #fff3d6; outline-offset: 2px; }
-#omf-setup .keys { margin-top: 10px; text-align: center; font: 600 clamp(9px, .7vw, 12px) ${UI_FONT}; letter-spacing: .14em;
+#omf-setup .keys { flex: 0 0 auto; margin-top: 10px; text-align: center; font: 600 clamp(9px, .7vw, 12px) ${UI_FONT}; letter-spacing: .14em;
   color: rgba(170, 190, 235, .7); text-transform: uppercase; }
+/* Short landscape viewports (especially phones at 2x DPR): keep the footer fixed on-screen and scroll just the options. */
+@media (max-height: 760px) {
+  #omf-setup { align-items: stretch; overflow: hidden;
+    padding: max(env(safe-area-inset-top, 0px), clamp(10px, 6vh, 28px))
+      max(env(safe-area-inset-right, 0px), 10px) max(env(safe-area-inset-bottom, 0px), 8px)
+      max(env(safe-area-inset-left, 0px), 10px); }
+  #omf-setup > div { width: min(1000px, 94vw); height: 100%; max-height: 100%; }
+  #omf-setup .panel { flex: 1 1 auto; max-height: none; }
+  #omf-setup header { padding: 7px clamp(12px, 2vw, 20px) 4px; }
+  #omf-setup h1 { font-size: clamp(16px, 2.1vw, 22px); }
+  #omf-setup header p { margin-top: .3em; font-size: clamp(10px, .9vw, 12px); }
+  #omf-setup .rows { padding-inline: 8px; }
+  #omf-setup .row { gap: 10px; margin: 1px 0; padding: clamp(4px, .8vh, 7px) 9px; }
+  #omf-setup .row h2 { font-size: clamp(10px, .9vw, 13px); }
+  #omf-setup .row p { margin-top: .2em; font-size: clamp(9px, .75vw, 11px); }
+  #omf-setup .chips { gap: 5px; }
+  #omf-setup .chip { min-width: 5.5em; padding: .45em .8em; font-size: clamp(9px, .75vw, 12px); }
+  #omf-setup footer { gap: 8px; padding: 7px clamp(12px, 2vw, 20px); }
+  #omf-setup .presets { gap: 6px; }
+  #omf-setup .btn { padding: .55em .9em; font-size: clamp(9px, .72vw, 11px); }
+  #omf-setup .start { padding: .65em 1.5em; font-size: clamp(11px, .9vw, 13px); }
+  #omf-setup .keys { margin-top: 4px; font-size: clamp(8px, .65vw, 10px); }
+}
 `;
 
 /**

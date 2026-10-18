@@ -5,8 +5,8 @@
 - **Node.js 22.12+** (developed on Node 24) and npm.
 - **The original game's data** comes with the repository (`public/gamedata/`; *One Must Fall 2097* is freeware, see
   [NOTICE.md](../NOTICE.md)), and so does the imported HD artwork (`public/hd/`).
-- **Desktop build only:** Rust stable via [rustup](https://rustup.rs), network access for the first build (Cargo
-  downloads crates; on Linux the Tauri CLI also downloads the AppImage tools), and:
+- **Desktop or Android native builds:** Rust stable via [rustup](https://rustup.rs) and network access for the first build (Cargo downloads crates).
+- **Desktop build only:** on Linux the Tauri CLI also downloads the AppImage tools, and:
   - Windows: Visual Studio 2022 Build Tools (or newer) with the "Desktop development with C++" workload (MSVC linker
     and Windows SDK), and the Microsoft Edge WebView2 runtime, which comes with Windows 10 and 11.
   - macOS: the Xcode command line tools (`xcode-select --install`).
@@ -313,6 +313,54 @@ frames from the app itself, pictures, sounds and fonts also from `data:` and `bl
 (`http://ipc.localhost`). Anything new from elsewhere (another site, another URL scheme) must be added there. The game
 and Studio build their styles while they run, so Tauri is kept from adding a nonce to `style-src` (with a nonce there,
 browsers ignore `'unsafe-inline'` and refuse those styles). `npm run desktop:dev` runs under the looser `devCsp`.
+
+## Android
+
+The native Android shell (Tauri 2) starts directly in landscape and immersive full-screen mode. Its generated activity
+is configured by `tools/android/configure.mjs`; the script reapplies the orientation, transient system bars, display-cutout
+settings and Android's normal (no prompt) vibration permission after `tauri android init` and before each build.
+`src-tauri/gen/android/` remains generated/ignored, not checked in.
+
+Install Android Studio, its bundled JDK (17 or newer), and from SDK Manager install **Android SDK Platform**,
+**Platform-Tools**, **Build-Tools**, **Command-line Tools** and **NDK (Side by side)**. Set `JAVA_HOME`, `ANDROID_HOME`
+and `NDK_HOME` for your machine, then install the Android Rust targets:
+
+```sh
+rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+```
+
+Then run:
+
+```sh
+npm run android:init                 # creates Tauri's Android project and configures immersive landscape mode
+npm run android:dev                  # run on a connected device or emulator (hot reload)
+npm run android:dev -- --open       # open the generated project in Android Studio
+npm run android:build                # release APKs for the supported Android ABIs
+npm run android:bundle               # Android App Bundle for store distribution
+```
+
+For ready-to-install testing builds, `.github/workflows/android-apk.yml` builds optimized, debug-key-signed APKs for
+64-bit ARM (`arm64`) and 32-bit ARM (`armv7`) on pull requests and pushes to `main`, or when run manually from
+**Actions → Android APK**. The artifact contains `OMF-2097-Remastered-arm64.apk` for 64-bit ARM phones and
+`OMF-2097-Remastered-armv7-32bit.apk` for 32-bit ARM phones. These are for device testing, not Play Store releases;
+Play distribution needs your own release signing key.
+
+For a physical device, enable USB debugging and accept its ADB prompt. If Android Studio cannot reach the Vite server,
+pass the computer's LAN address to the mobile dev server, for example `npm run android:dev -- --host 192.168.1.25`.
+The generated APK/AAB files are under `src-tauri/gen/android/app/build/outputs/`. A Play Store upload needs your own
+release signing key; signing credentials are not stored in this repository. The current release workflow still publishes
+desktop builds only. Files exported from Android are written under the app's scoped
+`Android/data/com.omf2097.remastered/files/Download/OMF 2097 Remastered` directory, so no broad storage permission is
+requested; copy them elsewhere before uninstalling the app.
+
+The Android renderer is tuned for a GPU-bound game: Android starts with a conservative 4×-native internal-resolution
+ceiling, the canvas is budgeted to at most 3 megapixels (2.25 device-pixel scale), and the full scene render is capped
+to 60 Hz on high-refresh displays; fixed 100 Hz input ticks and game-speed simulation ticks keep running.
+The GPU timer can lower or raise the internal render scale according to the phone's actual load. Fight controls support simultaneous
+multitouch, cancellation-safe input release, persisted per-button placement/size, stick dead-zone, opacity and optional
+haptics. In **OPTIONS > CONTROLS > EDIT TOUCH CONTROLS**, drag each button, adjust the selected control's size, and save
+or cancel the layout. Android system Back closes this editor, backs out of menus, pauses a fight, and takes a deliberate
+double press at the main menu to exit.
 
 ## App icon
 

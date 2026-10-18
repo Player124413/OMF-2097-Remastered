@@ -1,11 +1,11 @@
 /**
  * Platform shim: desktop (Tauri 2) vs. plain web build.
  *
- * On desktop this talks to Tauri through the global API that `app.withGlobalTauri` injects as
+ * Native shells talk to Tauri through the global API that `app.withGlobalTauri` injects as
  * `window.__TAURI__` (src-tauri/tauri.conf.json), so the web bundle has no runtime npm
- * dependencies. Only the window commands allowed in src-tauri/capabilities/default.json are
- * usable: is/set fullscreen, set title and close; and the shell's own `save_file` and `open_studio`
- * commands (src-tauri/src/lib.rs).
+ * dependencies. The game uses the window commands allowed in src-tauri/capabilities/default.json
+ * (fullscreen, title and close), the shell's `save_file` / `open_studio` commands, and Android's
+ * native Back event (src-tauri/src/lib.rs).
  *
  * None of the functions reject. Failures (e.g. a browser refusing fullscreen outside a user
  * gesture) are logged with console.warn and otherwise ignored.
@@ -21,6 +21,10 @@ interface TauriWindow {
 
 interface TauriGlobal {
   window: { getCurrentWindow(): TauriWindow };
+  /** Built-in Tauri Android back gesture. Registering takes over WebView history / exit defaults. */
+  app?: {
+    onBackButtonPress?(handler: (payload: { canGoBack: boolean }) => void): Promise<{ unregister(): void }>;
+  };
   core: {
     invoke<T>(cmd: string, args?: Record<string, unknown> | ArrayBuffer | Uint8Array, options?: { headers: Record<string, string> }): Promise<T>;
   };
@@ -46,8 +50,14 @@ const tauri: TauriGlobal | undefined = findTauri();
 /** The game's native window when running in the desktop shell. */
 const appWindow: TauriWindow | undefined = tauri?.window.getCurrentWindow();
 
-/** True when running inside the Tauri desktop shell (with its global API available). */
-export const isDesktop: boolean = appWindow !== undefined;
+/** True when running inside any Tauri native shell (desktop or mobile). */
+export const isTauri: boolean = appWindow !== undefined;
+
+/** True in the native Android shell; mobile browsers remain ordinary web builds. */
+export const isAndroidApp: boolean = isTauri && typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+
+/** True in a Tauri desktop shell (not Android, where downloads, back navigation and touch UX are mobile-native). */
+export const isDesktop: boolean = isTauri && (typeof navigator === 'undefined' || !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
 
 /**
  * Inside another page's frame (OMF Studio's test of a mod): the desktop shell's API reaches frames too (through the
@@ -74,6 +84,14 @@ export function blockBrowserMenu(): void {
 
 function warn(what: string, err: unknown): void {
   console.warn(`[platform] ${what} failed:`, err);
+}
+
+/** Registers the native Android back gesture. Once registered, the caller owns pause/navigation/exit behavior. */
+export function onAndroidBackPress(handler: () => void): boolean {
+  const listen = tauri?.app?.onBackButtonPress;
+  if (!isAndroidApp || !listen) return false;
+  void listen(() => handler()).catch((err) => warn('onBackButtonPress()', err));
+  return true;
 }
 
 /**

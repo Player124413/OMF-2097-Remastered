@@ -28,7 +28,7 @@ import { startBootTips } from './platform/bootTips';
 import { FontSize, getFont, setTextAudit, type TextAuditHit } from './game/gui/text';
 import { GLRenderer } from './video/gl/renderer';
 import { drawList } from './video/draw';
-import { blockBrowserMenu, framed, isDesktop, isFullscreen, quitApp, setFullscreen, toggleFullscreen } from './platform/desktop';
+import { blockBrowserMenu, framed, isAndroidApp, isDesktop, isFullscreen, isTauri, onAndroidBackPress, quitApp, setFullscreen, toggleFullscreen } from './platform/desktop';
 import { onKey } from './controller/input';
 import { HdAssets, hdAssets } from './video/hd/assets';
 import { arenaGeometry } from './video/hd/geometry';
@@ -131,9 +131,22 @@ function autoHideCursor(): void {
 }
 
 function resize(): void {
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.max(1, Math.round(canvas.clientWidth * dpr));
-  canvas.height = Math.max(1, Math.round(canvas.clientHeight * dpr));
+  const width = Math.max(1, canvas.clientWidth);
+  const height = Math.max(1, canvas.clientHeight);
+  // On mobile, the native game's detail tops out at about 4x 320x200. Rendering a 3x-DPR 1440p surface on top of
+  // that only burns battery and memory, so keep a generous 3 MP budget and let the HD renderer's GPU timer refine it.
+  const touchDevice = isAndroidApp || (navigator.maxTouchPoints > 0 && matchMedia('(pointer: coarse)').matches);
+  const pixelBudget = touchDevice ? 3_000_000 : 8_000_000;
+  const dpr = Math.min(
+    window.devicePixelRatio || 1,
+    touchDevice ? 2.25 : 3,
+    Math.sqrt(pixelBudget / (width * height)),
+    4096 / Math.max(width, height),
+  );
+  const pixelWidth = Math.max(1, Math.round(width * dpr));
+  const pixelHeight = Math.max(1, Math.round(height * dpr));
+  if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+  if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
 }
 
 /**
@@ -387,12 +400,43 @@ async function main(): Promise<void> {
   const help = new HelpOverlay((paused) => (engine.paused = paused && !gs.net));
   // Touch controls: in fights (not replays, demos or the pause menu) and on the robot select screen.
   const touch = new TouchControls();
+  app.editTouchControls = () => touch.openEditor();
   const touchWanted = () => {
     if (help.isOpen()) return false;
     if (gs.thisId === SceneId.MELEE) return true;
     const menuOpen = (gs.sc as { menuVisible?: boolean }).menuVisible;
     return gs.sc.isArena() && !gs.replay && !gs.isDemoplay() && !menuOpen && gs.getPlayer(0).ctrl.type !== CtrlType.AI;
   };
+  // Android's system Back behaves like Escape in fights/menus, closes the touch editor first, and double-Back exits
+  // from the main menu instead of silently navigating away from the WebView.
+  let lastMenuBackAt = 0;
+  onAndroidBackPress(() => {
+    if (touch.isEditing()) {
+      touch.cancelEditor();
+      return;
+    }
+    const pulseEscape = () => {
+      setKeyState('Escape', true);
+      window.setTimeout(() => setKeyState('Escape', false), 130);
+    };
+    if (help.isOpen()) {
+      pulseEscape();
+      help.key('Escape');
+      return;
+    }
+    if (gs.thisId === SceneId.MENU && gs.sc instanceof MainMenuScene && gs.sc.atMainPage()) {
+      const now = performance.now();
+      if (now - lastMenuBackAt < 1700) {
+        lastMenuBackAt = 0;
+        app.quit();
+      } else {
+        lastMenuBackAt = now;
+        toast(tr('Press Back again to quit.'), 1500);
+      }
+      return;
+    }
+    pulseEscape();
+  });
   // Mouse: menus take hovers and clicks first (topmost frame first), then the scene; other clicks mean "continue"
   // (left) or "back" (right) on screens without menus. Fights ignore the mouse (except their pause menu).
   initMouse(canvas, (px, py) => renderer.canvasToNative(px, py));
@@ -497,6 +541,12 @@ async function main(): Promise<void> {
       clips.frame();
     },
   });
+  // Rendering the same game at 90/120 Hz wastes mobile GPU time; fixed simulation/input ticks keep running. Tell the
+  // no-GPU-timer resolution heuristic this is intentional so a 90 Hz display's 22/11 ms cadence isn't a false overload.
+  if (isAndroidApp) {
+    engine.maxRenderFps = 60;
+    renderer.frameRateCap = 60;
+  }
   // Impact bass: a low thump under heavy hits, slams and knockouts (the original sounds stay as they are).
   onFx((e) => {
     const p = Math.max(0, Math.min(60, e.power));
@@ -622,11 +672,11 @@ async function main(): Promise<void> {
   };
   app.toggleFullscreen = () => void toggleFullscreen().then(syncFullscreenSetting);
   document.addEventListener('fullscreenchange', () => void syncFullscreenSetting());
-  // Browsers only allow fullscreen from a user gesture; the desktop shell can restore it at startup.
-  if (isDesktop && settings().video.fullscreen) void setFullscreen(true);
-  else if (!isDesktop) void syncFullscreenSetting();
+  // Browsers only allow fullscreen from a user gesture; a native shell can restore it at startup.
+  if (isTauri && settings().video.fullscreen) void setFullscreen(true);
+  else if (!isTauri) void syncFullscreenSetting();
   app.quit = () => {
-    if (isDesktop && !framed) void quitApp();
+    if (isTauri && !framed) void quitApp();
     else gs.setNext(SceneId.MENU);
   };
   gs.onQuit = () => app.quit();
@@ -807,9 +857,9 @@ async function main(): Promise<void> {
     }).catch(() => toast(tr('The songs could not be saved in this browser.')));
   });
 
-  // The web version: closing the tab in the middle of a fight asks first (player 2's Ctrl + W is the browser's close
-  // tab, which no page can stop; demo fights, replays, the credits and OMF Studio's tests may go).
-  if (!isDesktop && !params.has('nopause')) {
+  // The browser version: closing the tab in the middle of a fight asks first (player 2's Ctrl + W is the browser's
+  // close tab, which no page can stop; demo fights, replays, credits and Studio tests may go).
+  if (!isTauri && !params.has('nopause')) {
     window.addEventListener('beforeunload', (e) => {
       if (!restarting && isArenaScene(gs.thisId) && !gs.isDemoplay() && !gs.replay && !gs.credits && !gs.modTest) {
         e.preventDefault();
@@ -904,8 +954,8 @@ async function main(): Promise<void> {
   };
 }
 
-// Web version: work offline and be installable (not in the desktop app or the dev server).
-if (import.meta.env.PROD && !isDesktop && 'serviceWorker' in navigator && location.protocol.startsWith('http')) {
+// Web version: work offline and be installable (not inside either native shell or the dev server).
+if (import.meta.env.PROD && !isTauri && 'serviceWorker' in navigator && location.protocol.startsWith('http')) {
   // (the list of what the page loads: the first visit hands it to the worker, see below)
   performance.setResourceTimingBufferSize(2000);
   window.addEventListener('load', () => {

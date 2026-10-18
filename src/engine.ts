@@ -1,4 +1,4 @@
-// Main loop: fixed-rate static (100 Hz) and dynamic (game-speed) ticks, rendering every animation frame.
+// Main loop: fixed-rate static (100 Hz) and dynamic (game-speed) ticks; the host may cap expensive frame rendering.
 import type { GameState } from './game/gameState';
 import { drawList } from './video/draw';
 import { vga } from './video/vga';
@@ -23,6 +23,7 @@ export class Engine {
   private last = 0;
   private running = false;
   private raf = 0;
+  private renderElapsed = 0;
   /** Fraction of the next dynamic tick already elapsed (for motion interpolation). */
   alpha = 0;
   paused = false;
@@ -30,6 +31,8 @@ export class Engine {
   waiting = false;
   /** Draw objects between game ticks (smooth motion on high refresh rate displays). */
   interpolate = false;
+  /** Optional render cap; simulation ticks continue at their normal fixed rates between rendered frames. */
+  maxRenderFps = 0;
   frames = 0;
   ticks = 0;
   /** Frames that threw (logged, the loop keeps running). */
@@ -41,12 +44,27 @@ export class Engine {
     if (this.running) return;
     this.running = true;
     this.last = performance.now();
+    this.renderElapsed = 0;
     const loop = (now: number) => {
       if (!this.running) return;
       // Schedule the next frame first: an exception in this one must not stop the game loop.
       this.raf = requestAnimationFrame(loop);
       try {
-        this.frame(now);
+        const dt = Math.max(0, now - this.last);
+        this.last = now;
+        if (!this.paused && !this.waiting) this.advance(dt);
+        const interval = this.maxRenderFps > 0 ? 1000 / this.maxRenderFps : 0;
+        if (interval > 0) {
+          // Keep the simulation/input/audio clocks moving on every browser frame, but only repaint the expensive scene
+          // when its render-time accumulator reaches the cap. Carry the remainder so 90/144 Hz displays average 60 Hz
+          // instead of dropping to 45/48 Hz through a simple elapsed-time comparison.
+          this.renderElapsed += dt;
+          if (this.renderElapsed + 0.5 < interval) return;
+          this.renderElapsed -= interval;
+          if (this.renderElapsed < 0) this.renderElapsed = 0;
+          else if (this.renderElapsed >= interval) this.renderElapsed %= interval;
+        }
+        this.renderCurrentFrame();
       } catch (err) {
         this.errors++;
         if (this.errors <= 5) console.error('[engine] frame failed:', err);
@@ -106,7 +124,12 @@ export class Engine {
   frame(now: number): void {
     const dt = now - this.last;
     this.last = now;
+    this.renderElapsed = 0;
     if (!this.paused && !this.waiting) this.advance(dt);
+    this.renderCurrentFrame();
+  }
+
+  private renderCurrentFrame(): void {
     drawList.begin();
     drawList.interpAlpha = this.interpolate ? this.alpha : -1;
     this.gs.render();
