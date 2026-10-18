@@ -36,7 +36,7 @@ concurrency:
 jobs:
   build:
     name: Build installable universal debug APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v7
@@ -46,7 +46,7 @@ jobs:
           node-version: 24
           cache: npm
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -70,7 +70,7 @@ jobs:
           workspaces: src-tauri
           key: android
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - run: npm ci
 
@@ -88,7 +88,7 @@ jobs:
           npm run android:build -- --debug --ci 2>&1 | tee android-build.log
           result=${PIPESTATUS[0]}
           if ((result != 0)); then
-            excerpt=$(tail -n 45 android-build.log | tr '\n' ' ' | cut -c1-4000 | sed 's/%/%25/g; s/\r/%0D/g')
+            excerpt=$(tail -n 45 android-build.log | sed -E 's/\x1B\[[0-9;]*[[:alpha:]]//g' | tr '\n' ' ' | cut -c1-4000 | sed 's/%/%25/g; s/\r/%0D/g')
             echo "::error title=Android build failure details::$excerpt"
             exit "$result"
           fi
