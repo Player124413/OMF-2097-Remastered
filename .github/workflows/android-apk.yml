@@ -82,7 +82,24 @@ jobs:
 
       # Debug variant uses Android's debug signing key, so the downloaded universal APK can be installed for testing.
       - name: Build universal debug APK
-        run: npm run android:build -- --debug --ci
+        shell: bash
+        run: |
+          set +e
+          npm run android:build -- --debug --ci 2>&1 | tee android-build.log
+          result=${PIPESTATUS[0]}
+          if ((result != 0)); then
+            excerpt=$(tail -n 45 android-build.log | tr '\n' ' ' | cut -c1-4000 | sed 's/%/%25/g; s/\r/%0D/g')
+            echo "::error title=Android build failure details::$excerpt"
+            exit "$result"
+          fi
+
+      - name: Upload Android build log on failure
+        if: failure() && hashFiles('android-build.log') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: OMF-2097-Android-build-log-${{ github.run_number }}
+          path: android-build.log
+          retention-days: 14
 
       - name: Collect APK and checksum
         shell: bash
