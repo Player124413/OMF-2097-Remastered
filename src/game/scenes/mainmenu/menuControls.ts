@@ -31,6 +31,8 @@ export function menuControlsCreate(s: MainMenuScene): Menu {
   const touchModes = ['auto', 'on', 'off'] as const;
   menu.attach(new TextSelector(tr('TOUCH PAD'), tr('On-screen stick and buttons for phones and tablets: AUTO shows them once the screen is touched.'), () => touchModes.indexOf(settings().keys.touch), (pos) => (settings().keys.touch = touchModes[pos]),
   [tr('AUTO'), tr('ON'), tr('OFF')], settingsChanged));
+  menu.attach(new Button(tr('EDIT TOUCH CONTROLS'), tr('Move and resize every on-screen control, adjust stick sensitivity, opacity and vibration.'), false, false,
+    () => app.editTouchControls()));
   menu.attach(new Button(tr('DONE'), tr('Go back to the options.'), false, false, menuDone));
   return menu;
 }

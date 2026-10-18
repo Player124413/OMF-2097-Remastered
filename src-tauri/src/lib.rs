@@ -136,6 +136,9 @@ pub fn run() {
     })
     .setup(|app| {
       app.manage(lan::Lan::new(Arc::new(GameEvents(app.handle().clone()))));
+      // The Android activity creates its single `main` window from tauri.android.conf.json. Desktop keeps
+      // its dynamic startup window so it can optionally launch OMF Studio instead of the game.
+      #[cfg(not(mobile))]
       open_window(app.handle(), studio_start())?;
       Ok(())
     })

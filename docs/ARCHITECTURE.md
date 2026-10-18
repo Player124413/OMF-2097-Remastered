@@ -13,7 +13,8 @@ OpenOMF project (MIT, https://github.com/omf2097/openomf); rendering and platfor
 | `src/resources/` | Runtime resources built from parsed files: `loadAf`, `loadBk`, `langGet`, `fonts()`, `soundBank()`, `loadPic`, `loadTournament`. Loaded AF/BK objects are fresh mutable copies per scene. |
 | `src/video/` | Draw list (`video.draw*`), VGA palette state (`vga`), indexed `Surface`, WebGL2 renderer; `stage/`: live backdrops (the main menu's parallax scene). |
 | `src/audio/` | Audio system (3 SFX channels + PSM music in an AudioWorklet; impact thumps; an effects send through a convolution reverb for the arena acoustics). |
-| `src/platform/` | Desktop shell bridge (`desktop.ts`); the web version's game data import (`gameData.ts`: installer and zip unpacking, IndexedDB) and its first-run screen (`importScreen.ts`). |
+| `src/platform/` | Native-shell bridge (`desktop.ts`); configurable multitouch controls (`touch.ts`); the web version's game data import (`gameData.ts`: installer and zip unpacking, IndexedDB) and its first-run screen (`importScreen.ts`). |
+| `src-tauri/` | Tauri 2 desktop shell and mobile entry point; `tauri.android.conf.json` defines the fullscreen Android window, while `tools/android/configure.mjs` patches the generated Android activity for landscape/immersive mode. |
 | `src/controller/` | Controllers: keyboard, gamepad, AI (`ai.ts`), menu polling, network players (`net.ts`). |
 | `src/game/` | Game logic: `GameState`, `Scene`, `GameObject` (object+animation player), HAR/projectile/hazard/scrap objects, score, GUI, scenes. |
 | `src/game/scenes/` | One module per scene family; each calls `registerScene(SceneId.X, gs => new XScene(gs))`. `index.ts` imports them all. |

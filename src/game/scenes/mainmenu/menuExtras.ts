@@ -1,6 +1,6 @@
 // MAIN MENU > EXTRAS: the remaster's robot workshop, mods, replays and records, and the original's DEMO and SCOREBOARD.
 import { app } from '../../../app';
-import { openStudio } from '../../../platform/desktop';
+import { isAndroidApp, openStudio } from '../../../platform/desktop';
 import { Button, Label, Menu } from '../../gui/widgets';
 import type { MainMenuScene } from '../mainmenu';
 import { menuDone } from './common';
@@ -12,7 +12,7 @@ export function menuExtrasCreate(s: MainMenuScene): Menu {
   menu.attach(Label.title(tr('EXTRAS')));
   menu.attach(new Button(tr('ROBOT WORKSHOP'), tr('Build your own robots from the parts of the new robots, try them out and share them as files.'), false, false, () => app.showWorkshop()));
   menu.attach(new Button(tr('MODS'), tr('More robots, arenas and pilots: the new robots and arenas made for the remaster, and mods made by players with OMF Studio. Turn them on or off, install mod files.'), false, false, () => app.showMods()));
-  menu.attach(new Button(tr('OMF STUDIO'), tr('The mod tools: make your own robots, arenas and pilots, pixel for pixel, and play them in the game.'), false, false, () => void openStudio()));
+  if (!isAndroidApp) menu.attach(new Button(tr('OMF STUDIO'), tr('The mod tools: make your own robots, arenas and pilots, pixel for pixel, and play them in the game.'), false, false, () => void openStudio()));
   menu.attach(new Button(tr('REPLAYS'), tr('Watch your saved fights again, slow them down, step through them and save clips.'), false, false,
     () => app.showReplays()));
   menu.attach(new Button(tr('RECORDS'), tr('Your statistics, the best results of the modes, and achievements.'), false, false,

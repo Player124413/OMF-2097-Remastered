@@ -122,6 +122,8 @@ export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(VERSION) },
   plugins: [debugCapture(), lanRelay()],
   server: {
+    // Android's emulator / physical device has to reach Vite over the LAN during `tauri android dev`.
+    host: process.env.TAURI_DEV_HOST || '0.0.0.0',
     port: 5173,
     strictPort: true,
     // Big generated and working folders (screen recordings, the art packs, the original game, the desktop build) are

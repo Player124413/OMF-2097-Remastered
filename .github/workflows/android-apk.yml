@@ -1,0 +1,108 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'src-tauri/**'
+      - 'tools/android/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - '.github/workflows/android-apk.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'src-tauri/**'
+      - 'tools/android/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build installable universal debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0 ndk;27.2.12479018
+
+      - name: Set Android NDK path
+        run: |
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          test -d "$ANDROID_HOME/ndk/27.2.12479018"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: android
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: npm ci
+
+      - name: Typecheck frontend
+        run: npm run typecheck
+
+      - name: Generate Android project
+        run: npm run android:init
+
+      # Debug variant uses Android's debug signing key, so the downloaded universal APK can be installed for testing.
+      - name: Build universal debug APK
+        run: npm run android:build -- --debug --ci
+
+      - name: Collect APK and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t apks < <(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*.apk' -print | sort)
+          if ((${#apks[@]} == 0)); then
+            echo 'Gradle did not produce an APK.' >&2
+            exit 1
+          fi
+          mkdir -p artifacts/android-apk
+          for apk in "${apks[@]}"; do
+            cp "$apk" artifacts/android-apk/
+          done
+          (cd artifacts/android-apk && sha256sum *.apk > SHA256SUMS)
+          ls -lh artifacts/android-apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: OMF-2097-Remastered-Android-debug-${{ github.run_number }}
+          path: artifacts/android-apk/
+          if-no-files-found: error
+          retention-days: 14
