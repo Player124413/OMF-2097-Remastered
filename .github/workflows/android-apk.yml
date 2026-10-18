@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build installable universal testing APK
+    name: Build installable ARM64 testing APK
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -63,7 +63,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+          targets: aarch64-linux-android
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -78,16 +78,16 @@ jobs:
         run: npm run typecheck
 
       - name: Generate Android project
-        run: npm run android:init
+        run: npx tauri android init --ci --skip-targets-install && node tools/android/configure.mjs
 
-      # Use the optimized release profile but sign with Android's debug key so the APK is installable for testing.
-      - name: Build universal testing APK
+      # Build the optimized ARM64 release profile but sign with Android's debug key for device testing.
+      - name: Build ARM64 testing APK
         shell: bash
         env:
           ANDROID_DEBUG_SIGN_RELEASE: '1'
         run: |
           set +e
-          npm run android:build -- --ci 2>&1 | tee android-build.log
+          npm run android:build -- --ci --target aarch64 --split-per-abi 2>&1 | tee android-build.log
           result=${PIPESTATUS[0]}
           if ((result != 0)); then
             excerpt=$(tail -n 45 android-build.log | sed -E 's/\x1B\[[0-9;]*[[:alpha:]]//g' | tr '\n' ' ' | cut -c1-4000 | sed 's/%/%25/g; s/\r/%0D/g')
@@ -121,7 +121,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: OMF-2097-Remastered-Android-testing-${{ github.run_number }}
+          name: OMF-2097-Remastered-Android-arm64-${{ github.run_number }}
           path: artifacts/android-apk/
           if-no-files-found: error
           retention-days: 14
